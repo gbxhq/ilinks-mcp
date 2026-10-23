@@ -11,6 +11,7 @@
     "src",
     "bin",
     "README.md",
+    "SKILL.md",
     "LICENSE"
   ],
   "scripts": {

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { getUpdateNotice } from '../updater.js';
 
 /**
  * 格式化配额文本
@@ -66,11 +67,12 @@ export function registerAllTools(server, client) {
     async () => {
       try {
         const quota = await client.getQuota();
+        const updateNotice = await getUpdateNotice('1.0.0');
         return {
           content: [
             {
               type: 'text',
-              text: formatQuotaSummary(quota)
+              text: `${formatQuotaSummary(quota)}${updateNotice}`
             }
           ]
         };

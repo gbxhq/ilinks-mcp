@@ -127,20 +127,22 @@ npx 支持直接指向独立的 GitHub 开源仓库，无需发布 npm：
 您可以直接将以下 Prompt 复制发给它，它会自动判断环境并完成本地安装与测试：
 
 ```text
-你是一个智能工作伙伴。我现在需要你帮我接入 iLinks 个人书签管理的 MCP 插件。
+请帮我安装并接入 iLinks 书签管理的 MCP 服务：
 
-以下是服务接入信息：
-- 插件服务名：ilinks-bookmarks
-- API 接口地址 (ILINKS_API_BASE)：https://ilinks.fun
-- 我的个人专属 Token (ILINKS_TOKEN)：【请填入您的Token】
+【服务信息】
+- 服务名称：ilinks-bookmarks
+- 环境变量：
+  - ILINKS_API_BASE: https://ilinks.fun
+  - ILINKS_TOKEN: 【请填入您的专属Token】
+- 仓库地址：https://github.com/gbxhq/ilinks-mcp
 
-请你执行以下步骤：
-1. 检测当前环境是否能通过 `npx -y ilinks-mcp` 启动服务；如果 npm 仓库中已有此包，直接配置 npx 启动；
-2. 如果 npm 尚未发布此包，请帮我在本地目录（如 ~/.ilinks-mcp）配置源码或启动脚本，并通过 node 执行 `bin/ilinks-mcp.js`；
-3. 将该服务配置添加到当前客户端的 MCP 配置文件中（服务名: ilinks-bookmarks）；
-4. 启动并测试调用 `ilinks_get_quota` 工具，确认能够正常读取我的书签和文件夹配额；
-5. 读取成功后，向我汇报我当前的账号容量情况（书签数、文件夹数、剩余配额、VIP状态）；
-6. 后续当我需要查询、搜索、保存、整理或删除书签时，请直接调用该工具集完成。注意：书签和文件夹均有容量上限（普通用户书签188条/文件夹18个），满额时请主动拦截并提醒我清理旧书签或升级 VIP。
+【安装步骤】
+1. 将该服务写入当前客户端的 MCP 配置文件中：
+   - 方式 A（推荐）：command 为 "npx"，args 为 ["-y", "github:gbxhq/ilinks-mcp"]（或 ["-y", "ilinks-mcp"]）
+   - 方式 B（本地源码）：git clone https://github.com/gbxhq/ilinks-mcp.git 到本地目录，执行 npm install，通过 node 运行 bin/ilinks-mcp.js
+2. 启动服务并调用 `ilinks_get_quota` 测试连通性。
+3. 详细功能说明、工具集规范及使用约束请阅读仓库 README 或通过工具列表获取。
+4. 安装验证完成后，向我确认已接入成功即可。
 ```
 
 ---

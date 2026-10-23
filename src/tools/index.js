@@ -696,14 +696,27 @@ export function registerAllTools(server, client) {
   // 16. 发布新笔记
   server.tool(
     'ilinks_create_note',
-    '发布一篇新笔记。正文支持完整 Markdown 语法。发布前自动预检书签与笔记共享容量配额（普通用户 188 条上限），若容量已满主动拦截保护。【频控约束】严禁连续高频并发写入，每次调用后需间隔至少 2 秒。',
+    '发布一篇新笔记。正文支持完整 Markdown 语法（单篇限 20,000 字以内，首行自动作为笔记标题；若含图片仅支持 Markdown 外链语法 ![描述](https://...)，严禁 Base64 编码）。发布前自动预检书签与笔记共享容量配额（普通用户 188 条上限），若容量已满主动拦截保护。【频控约束】严禁连续高频并发写入，每次调用后需间隔至少 2 秒。',
     {
-      content: z.string().describe('笔记正文，支持完整 Markdown 格式（标题、列表、代码块、链接等）'),
+      content: z.string().max(20000).describe('笔记正文，必须为标准 Markdown 格式，单篇限 20,000 字以内。首行自动提取为标题。配图必须使用公网图片 URL 外链格式 ![描述](https://...)，严禁使用 Base64 图片'),
       folder_id: z.number().optional().describe('可选：目标笔记分类文件夹 ID。若未提供将自动匹配或引导创建笔记分类'),
       weight: z.number().optional().describe('可选：排序权重，数字越大越靠前，默认 0')
     },
     async ({ content, folder_id, weight = 0 }) => {
       try {
+        // 0. Base64 图片防护拦截
+        if (content.includes('data:image/')) {
+          return {
+            isError: true,
+            content: [
+              {
+                type: 'text',
+                text: '🚫【图片格式不支持】iLinks 笔记暂不支持直接嵌入 Base64 图片，这会导致内容极速超出 20,000 字限制。请将图片托管于外部图床/公网地址后，以标准 Markdown 外链形式写入：`![图片描述](https://...)`。'
+              }
+            ]
+          };
+        }
+
         // 1. 容量配额预检拦截
         const quota = await client.getQuota();
         if (!quota.is_vip && quota.content_remaining <= 0) {
@@ -795,15 +808,27 @@ export function registerAllTools(server, client) {
   // 17. 更新笔记
   server.tool(
     'ilinks_update_note',
-    '更新已有笔记的正文内容、所属分类文件夹或排序权重。正文支持 Markdown。【频控约束】严禁连续高频并发写入，每次调用后需间隔至少 2 秒。',
+    '更新已有笔记的正文内容、所属分类文件夹或排序权重。正文支持完整 Markdown 语法（单篇限 20,000 字以内，首行自动提取为标题；配图仅支持外链格式 ![描述](https://...)，严禁 Base64）。【频控约束】严禁连续高频并发写入，每次调用后需间隔至少 2 秒。',
     {
       id: z.number().describe('要修改的笔记 ID'),
-      content: z.string().describe('修改后的完整笔记正文内容 (Markdown)'),
+      content: z.string().max(20000).describe('修改后的完整笔记正文内容 (Markdown 格式，限 20,000 字内；首行自动提取为标题；配图仅限外链格式 ![描述](https://...)，严禁 Base64)'),
       folder_id: z.number().optional().describe('可选：修改归属的笔记分类文件夹 ID。若不填则保持原分类不变'),
       weight: z.number().optional().describe('可选：排序权重')
     },
     async ({ id, content, folder_id, weight = 0 }) => {
       try {
+        // 0. Base64 图片防护拦截
+        if (content.includes('data:image/')) {
+          return {
+            isError: true,
+            content: [
+              {
+                type: 'text',
+                text: '🚫【图片格式不支持】iLinks 笔记暂不支持直接嵌入 Base64 图片，这会导致内容极速超出 20,000 字限制。请将图片托管于外部图床/公网地址后，以标准 Markdown 外链形式写入：`![图片描述](https://...)`。'
+              }
+            ]
+          };
+        }
         let fid = folder_id;
         if (!fid) {
           const notes = await client.listNotes();

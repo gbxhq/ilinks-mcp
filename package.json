@@ -1,0 +1,49 @@
+{
+  "name": "ilinks-mcp",
+  "version": "1.0.0",
+  "description": "iLinks 官方 Model Context Protocol (MCP) 服务，支持通过大模型与智能 Agent 自然语言管理书签与分类，内置严格容量配额拦截。",
+  "type": "module",
+  "main": "src/index.js",
+  "bin": {
+    "ilinks-mcp": "bin/ilinks-mcp.js"
+  },
+  "files": [
+    "src",
+    "bin",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "node test/test_stdio.js",
+    "prepublishOnly": "npm test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gbxhq/ilinks-mcp.git"
+  },
+  "homepage": "https://ilinks.fun",
+  "bugs": {
+    "url": "https://github.com/gbxhq/ilinks-mcp/issues"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "ilinks",
+    "bookmarks",
+    "agent",
+    "workbuddy"
+  ],
+  "author": "iLinks Team <support@ilinks.fun>",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.6.1",
+    "zod": "^3.24.2"
+  }
+}

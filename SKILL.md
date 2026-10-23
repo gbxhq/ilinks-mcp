@@ -40,12 +40,12 @@ metadata:
 
 ---
 
-## 📊 核心准则二：容量配额预检与拦截治理 (Quota Governance)
-普通用户的账号配额共享如下：
-- **书签与笔记总容量**：默认 **188 条**（书签与笔记共享总额度）；
-- **文件夹数量**：默认 **18 个**；
-- **暂存箱容量**：默认 **100 条**；
-- **VIP 用户**：无容量限制。
+## 📊 核心准则二：动态容量配额预检与拦截治理 (Dynamic Quota Governance)
+用户的实际容量配额以系统接口返回的实时数据为准（用户可能因使用扩容卡兑换、参与活动奖励、VIP 会员或管理调整拥有完全不同的专属额度，严禁在对话中预设或硬编码固定的限制数字）：
+- **实时数据为准**：必须通过 `ilinks_get_quota` 接口读取当前用户的真实 `content_limit`（内容总上限）、`folder_limit`（文件夹上限）和 `content_remaining`（剩余可用额度）；
+- **书签与笔记共享容量**：书签与笔记共用同一套内容配额 (`content_count` = 书签数 + 笔记数)；
+- **VIP 用户**：`is_vip: true`，容量无上限；
+- **满额判定标准**：当且仅当 `!quota.is_vip && quota.content_remaining <= 0`（或 `folder_remaining <= 0`）时，判定为已满额。
 
 ### 🚨 满额拦截处置流程：
 在执行 `ilinks_create_bookmark`、`ilinks_batch_create_bookmarks`、`ilinks_create_folder`、`ilinks_create_note` 之前：

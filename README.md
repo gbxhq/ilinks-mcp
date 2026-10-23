@@ -77,12 +77,12 @@
 ---
 
 #### 方式 B：未发布到 npm 时的本地 / 源码运行方式（立即可用）
-在包尚未发布到 npm 官方仓库前，可通过本地克隆源码的方式直接启动：
+在包尚未发布到 npm 官方仓库前，可通过本地克隆独立开源仓库源码的方式直接启动：
 
-1. 克隆或下载本代码包到本地目录（例如 `~/.ilinks-mcp`）：
+1. 克隆独立客户端开源代码到本地目录（例如 `~/.ilinks-mcp`）：
    ```bash
-   git clone https://github.com/xuanshan/xydh.git ~/.ilinks-mcp
-   cd ~/.ilinks-mcp/ilinks-mcp && npm install
+   git clone https://github.com/gbxhq/ilinks-mcp.git ~/.ilinks-mcp
+   cd ~/.ilinks-mcp && npm install
    ```
 2. 在 WorkBuddy 或其他客户端中配置绝对路径：
    ```json
@@ -90,7 +90,7 @@
      "mcpServers": {
        "ilinks-bookmarks": {
          "command": "node",
-         "args": ["/Users/您的用户名/.ilinks-mcp/ilinks-mcp/bin/ilinks-mcp.js"],
+         "args": ["/Users/您的用户名/.ilinks-mcp/bin/ilinks-mcp.js"],
          "env": {
            "ILINKS_API_BASE": "https://ilinks.fun",
            "ILINKS_TOKEN": "您的专属Token"
@@ -103,13 +103,13 @@
 ---
 
 #### 方式 C：通过 Git 仓库直接运行（NPX 原生支持，免 npm 注册）
-npx 支持直接指向 git 仓库：
+npx 支持直接指向独立的 GitHub 开源仓库，无需发布 npm：
 ```json
 {
   "mcpServers": {
     "ilinks-bookmarks": {
       "command": "npx",
-      "args": ["-y", "github:xuanshan/ilinks-mcp"],
+      "args": ["-y", "github:gbxhq/ilinks-mcp"],
       "env": {
         "ILINKS_API_BASE": "https://ilinks.fun",
         "ILINKS_TOKEN": "您的专属Token"

@@ -1,0 +1,84 @@
+---
+name: ilinks-bookmark-manager
+description: iLinks (炫猿导航) 官方智能书签与笔记管理专家技能。指导 Agent 通过自然语言管理用户的导航书签、分类文件夹与笔记便签，遵循严格操作频控与容量配额治理。
+metadata:
+  version: "1.2.0"
+  triggers:
+    - ilinks
+    - 炫猿
+    - 炫猿导航
+    - 书签
+    - 导航
+    - 存网址
+    - 笔记
+    - 便签
+---
+
+# iLinks (炫猿导航) 智能书签与笔记管理指南
+
+本技能指导 AI 工作伙伴（如 WorkBuddy、Antigravity、Cursor 等）高效、安全地通过 `ilinks-bookmarks` MCP 工具集管理用户的个人书签与笔记。
+
+---
+
+## 🎯 唤醒与关键词识别
+当用户对话中包含以下意图或关键词时，主动调起本技能与对应工具：
+- **关键词**：`iLinks`、`炫猿`、`炫猿导航`、`书签`、`存书签`、`收藏网址`、`个人主页`、`导航分类`、`笔记`、`写笔记`、`查笔记`
+- **自然意图**：
+  - “帮我把这个网址存起来...”
+  - “我的书签还有多少空间？”
+  - “记一条笔记到我的导航...”
+  - “搜一下我存过的关于 Python 的链接...”
+
+---
+
+## 🛡️ 核心准则一：平缓操作与频控规范 (Rate Limiting)
+为保证线上系统高可用与防滥用，后端设置有严格的多维频控规则（普通用户每分钟写入上限 20 次，单日写入上限 200 次）。**Agent 必须严格遵守以下准则**：
+
+1. **严禁连续高频并发**：严禁编写并发或无停顿的循环脚本频繁调用写入接口；
+2. **写操作间隔缓冲**：每次执行创建、修改或删除操作后，自主在对话中保持平缓，**两次写操作间保持至少 2 秒间隔**；
+3. **小批量操作**：单次批量添加书签严禁超过 10 条；如用户提供大批网址，请分批次并向用户阶段性汇报进展。
+
+---
+
+## 📊 核心准则二：容量配额预检与拦截治理 (Quota Governance)
+普通用户的账号配额共享如下：
+- **书签与笔记总容量**：默认 **188 条**（书签与笔记共享总额度）；
+- **文件夹数量**：默认 **18 个**；
+- **暂存箱容量**：默认 **100 条**；
+- **VIP 用户**：无容量限制。
+
+### 🚨 满额拦截处置流程：
+在执行 `ilinks_create_bookmark`、`ilinks_batch_create_bookmarks`、`ilinks_create_folder`、`ilinks_create_note` 之前：
+1. 若容量已满，**必须主动拦截**，不得强行尝试；
+2. **草稿绝不丢失**：妥善留存用户要保存的网址或笔记正文，并在回复中完整呈现；
+3. **提供治理指引**：
+   - 建议 1：搜索并删除失效或不再访问的旧书签/旧笔记释放额度；
+   - 建议 2：整理暂存箱未归档内容；
+   - 建议 3：升级 VIP 成为终身无限容量会员。
+
+---
+
+## 🛠️ 工具能力全景矩阵
+
+### 1. 配额与分类
+- `ilinks_get_quota`：查看书签数、笔记数、总额度、剩余可用及 VIP 状态；
+- `ilinks_list_folders`：列出文件夹（识别 `bookmark` 书签分类与 `note` 笔记分类）；
+- `ilinks_create_folder`：新建分类文件夹（指定 `content_type` 为 `bookmark` 或 `note`）；
+- `ilinks_update_folder`：修改文件夹名称、图标、简介或密码；
+- `ilinks_delete_folder`：删除指定文件夹。
+
+### 2. 书签管理
+- `ilinks_list_bookmarks`：查看所有书签或指定文件夹下的书签；
+- `ilinks_search_bookmarks`：关键词模糊搜索（标题、URL、备注）；
+- `ilinks_create_bookmark`：添加新书签（自动预检配额）；
+- `ilinks_batch_create_bookmarks`：批量添加（单批推荐 <= 10 条）；
+- `ilinks_update_bookmark`：更新标题、URL、分类或备注；
+- `ilinks_delete_bookmark`：删除书签（释放 1 个配额）；
+- `ilinks_move_to_temp`：移入暂存箱。
+
+### 3. 笔记便签管理
+- `ilinks_list_notes`：查看笔记列表，支持按分类筛选或关键词正文模糊搜索；
+- `ilinks_get_note`：查看单篇笔记完整 Markdown 正文与评论；
+- `ilinks_create_note`：发布新笔记（支持 Markdown，自动预检共享容量）；
+- `ilinks_update_note`：更新笔记正文、所属分类或权重；
+- `ilinks_delete_note`：删除笔记（释放 1 个配额）。

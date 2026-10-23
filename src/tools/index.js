@@ -589,7 +589,7 @@ export function registerAllTools(server, client) {
 
         await client.moveToTemp(id);
         return {
-          content: [{ type: 'text', text: `✅ 书签 #${id} 已移入暂存箱。` }]
+          content: [{ type: 'text', text: `✅ 书签 #${id} 已移入暂存箱。\n\n(提示: 操作已完成。请注意操作频控，避免连续高频写入，下次写操作建议间隔 2 秒以上)` }]
         };
       } catch (err) {
         return {
@@ -599,4 +599,278 @@ export function registerAllTools(server, client) {
       }
     }
   );
+
+  // 14. 查看与搜索笔记列表
+  server.tool(
+    'ilinks_list_notes',
+    '获取用户的笔记列表。当用户要求查看笔记、搜索笔记或需要查看笔记内容时调用。支持按笔记分类文件夹 ID 过滤，或使用关键词在正文模糊搜索。',
+    {
+      folder_id: z.number().optional().describe('可选：指定笔记文件夹 ID 进行筛选。若不指定则查询全部笔记'),
+      keyword: z.string().optional().describe('可选：搜索关键词，按笔记标题或正文内容模糊匹配'),
+      limit: z.number().optional().describe('可选：返回记录数限制，默认 20 条，最大 50 条')
+    },
+    async ({ folder_id, keyword, limit = 20 }) => {
+      try {
+        let notes = await client.listNotes({ folder_id, limit: 50 });
+        if (keyword && keyword.trim()) {
+          const q = keyword.trim().toLowerCase();
+          notes = notes.filter((n) => {
+            const content = (n.content || '').toLowerCase();
+            const firstLine = (n.first_line || '').toLowerCase();
+            const summary = (n.summary || '').toLowerCase();
+            return content.includes(q) || firstLine.includes(q) || summary.includes(q);
+          });
+        }
+
+        if (!notes || notes.length === 0) {
+          return {
+            content: [{
+              type: 'text',
+              text: keyword ? `未找到包含关键词 "${keyword}" 的笔记。` : '暂无笔记记录。可通过 `ilinks_create_note` 发布新笔记。'
+            }]
+          };
+        }
+
+        const displayNotes = notes.slice(0, Math.min(limit || 20, 50));
+        const lines = [`【您的 iLinks 笔记列表 (共 ${notes.length} 条)】`];
+        displayNotes.forEach((note) => {
+          const title = note.first_line || note.summary || `笔记 #${note.id}`;
+          const date = (note.updated_at || note.created_at || '').slice(0, 10);
+          const comments = note.comment_count ? ` 💬${note.comment_count}` : '';
+          const likes = note.like_count ? ` 👍${note.like_count}` : '';
+          lines.push(`• [ID: ${note.id}] (分类ID: ${note.fid}) ${title} (${date})${comments}${likes}`);
+        });
+
+        lines.push(`\n提示: 可通过 \`ilinks_get_note\` 传入笔记 ID 查看完整 Markdown 正文内容。`);
+        return {
+          content: [{ type: 'text', text: lines.join('\n') }]
+        };
+      } catch (err) {
+        return {
+          isError: true,
+          content: [{ type: 'text', text: `获取笔记列表失败: ${err.message}` }]
+        };
+      }
+    }
+  );
+
+  // 15. 查看单篇笔记详情
+  server.tool(
+    'ilinks_get_note',
+    '根据笔记 ID 查看单篇笔记的完整详情。包含 Markdown 正文、所属分类、发布时间及评论。',
+    {
+      id: z.number().describe('笔记 ID')
+    },
+    async ({ id }) => {
+      try {
+        const notes = await client.listNotes();
+        const note = (notes || []).find((n) => n.id === id);
+        if (!note) {
+          return {
+            isError: true,
+            content: [{ type: 'text', text: `未找到 ID 为 ${id} 的笔记。` }]
+          };
+        }
+
+        const lines = [
+          `【笔记详情 (ID: ${note.id})】`,
+          `所属分类文件夹 ID: ${note.fid}`,
+          `创建时间: ${note.created_at} | 更新时间: ${note.updated_at || note.created_at}`,
+          `互动统计: 评论 ${note.comment_count || 0} 条 | 点赞 ${note.like_count || 0} 次`,
+          `----------------------------------------`,
+          note.content || '（正文为空）'
+        ];
+
+        return {
+          content: [{ type: 'text', text: lines.join('\n') }]
+        };
+      } catch (err) {
+        return {
+          isError: true,
+          content: [{ type: 'text', text: `获取笔记详情失败: ${err.message}` }]
+        };
+      }
+    }
+  );
+
+  // 16. 发布新笔记
+  server.tool(
+    'ilinks_create_note',
+    '发布一篇新笔记。正文支持完整 Markdown 语法。发布前自动预检书签与笔记共享容量配额（普通用户 188 条上限），若容量已满主动拦截保护。【频控约束】严禁连续高频并发写入，每次调用后需间隔至少 2 秒。',
+    {
+      content: z.string().describe('笔记正文，支持完整 Markdown 格式（标题、列表、代码块、链接等）'),
+      folder_id: z.number().optional().describe('可选：目标笔记分类文件夹 ID。若未提供将自动匹配或引导创建笔记分类'),
+      weight: z.number().optional().describe('可选：排序权重，数字越大越靠前，默认 0')
+    },
+    async ({ content, folder_id, weight = 0 }) => {
+      try {
+        // 1. 容量配额预检拦截
+        const quota = await client.getQuota();
+        if (!quota.is_vip && quota.content_remaining <= 0) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: [
+                  `🛑【容量已达上限，已主动安全拦截】`,
+                  `您的 iLinks 书签与笔记共享容量已达到上限 (${quota.content_limit} 条)，无法发布新笔记。`,
+                  `当前书签: ${quota.link_count} 条，笔记: ${quota.note_count} 条。`,
+                  ``,
+                  `💡 优化指引：`,
+                  `1. 可通过 \`ilinks_delete_bookmark\` 或 \`ilinks_delete_note\` 删除不再需要的旧内容以释放容量；`,
+                  `2. 升级 VIP 会员解锁无限容量。`,
+                  ``,
+                  `📝 您的笔记内容草稿已妥善留存如下，不会丢失：`,
+                  content
+                ].join('\n')
+              }
+            ]
+          };
+        }
+
+        // 2. 文件夹解析与校验
+        let targetFid = folder_id;
+        const folders = await client.listFolders();
+        const noteFolders = (folders || []).filter((f) => f.content_type === 'note');
+
+        if (!targetFid) {
+          if (noteFolders.length > 0) {
+            targetFid = noteFolders[0].id;
+          } else {
+            // 没有笔记文件夹，检查文件夹容量
+            if (!quota.is_vip && quota.folder_remaining <= 0) {
+              return {
+                isError: true,
+                content: [{
+                  type: 'text',
+                  text: `无法发布笔记：您当前尚未创建【笔记】分类文件夹，且文件夹容量已满 (${quota.folder_limit} 个)。请先删除无用文件夹或创建笔记分类。`
+                }]
+              };
+            }
+            // 自动创建一个默认笔记文件夹
+            const newFolder = await client.createFolder({
+              name: '我的笔记',
+              content_type: 'note',
+              info: 'AI 自动创建的笔记分类'
+            });
+            targetFid = newFolder.id;
+          }
+        } else {
+          const match = (folders || []).find((f) => f.id === targetFid);
+          if (match && match.content_type !== 'note') {
+            return {
+              isError: true,
+              content: [{
+                type: 'text',
+                text: `目标文件夹 [ID: ${targetFid}] "${match.name}" 是【书签】文件夹，不能存放笔记。请指定笔记文件夹，或通过 \`ilinks_create_folder\` 创建笔记分类。`
+              }]
+            };
+          }
+        }
+
+        const res = await client.createNote({
+          fid: targetFid,
+          content,
+          weight
+        });
+
+        const newId = res && res.id ? res.id : '成功';
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `✅ 笔记发布成功！[ID: ${newId}] 已归入分类文件夹 #${targetFid}。\n\n(提示: 操作已完成。请注意操作频控，避免连续高频写入，下次写操作建议间隔 2 秒以上)`
+            }
+          ]
+        };
+      } catch (err) {
+        return {
+          isError: true,
+          content: [{ type: 'text', text: `发布笔记失败: ${err.message}` }]
+        };
+      }
+    }
+  );
+
+  // 17. 更新笔记
+  server.tool(
+    'ilinks_update_note',
+    '更新已有笔记的正文内容、所属分类文件夹或排序权重。正文支持 Markdown。【频控约束】严禁连续高频并发写入，每次调用后需间隔至少 2 秒。',
+    {
+      id: z.number().describe('要修改的笔记 ID'),
+      content: z.string().describe('修改后的完整笔记正文内容 (Markdown)'),
+      folder_id: z.number().optional().describe('可选：修改归属的笔记分类文件夹 ID。若不填则保持原分类不变'),
+      weight: z.number().optional().describe('可选：排序权重')
+    },
+    async ({ id, content, folder_id, weight = 0 }) => {
+      try {
+        let fid = folder_id;
+        if (!fid) {
+          const notes = await client.listNotes();
+          const target = (notes || []).find((n) => n.id === id);
+          if (target) {
+            fid = target.fid;
+          }
+        }
+
+        if (!fid) {
+          return {
+            isError: true,
+            content: [{ type: 'text', text: `未找到笔记 #${id} 的原始所属文件夹，请显式提供 folder_id 参数。` }]
+          };
+        }
+
+        await client.updateNote({
+          id,
+          fid,
+          content,
+          weight
+        });
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `✅ 笔记 #${id} 已成功更新！\n\n(提示: 操作已完成。请注意操作频控，避免连续高频写入，下次写操作建议间隔 2 秒以上)`
+            }
+          ]
+        };
+      } catch (err) {
+        return {
+          isError: true,
+          content: [{ type: 'text', text: `更新笔记失败: ${err.message}` }]
+        };
+      }
+    }
+  );
+
+  // 18. 删除笔记
+  server.tool(
+    'ilinks_delete_note',
+    '删除指定 ID 的笔记。删除后将立即释放 1 个内容容量配额空间，便于继续保存新书签或发布新笔记。【频控约束】严禁连续高频并发写入，每次调用后需间隔至少 2 秒。',
+    {
+      id: z.number().describe('要删除的笔记 ID')
+    },
+    async ({ id }) => {
+      try {
+        await client.deleteNote(id);
+        const quota = await client.getQuota();
+        const rem = quota.is_vip ? '无限制' : `${quota.content_remaining} 条`;
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `✅ 笔记 #${id} 已成功删除，释放了 1 个容量配额。\n当前总容量已用: ${quota.content_count}/${quota.content_limit} 条 (剩余可用: ${rem})。\n\n(提示: 操作已完成。请注意操作频控，避免连续高频写入，下次写操作建议间隔 2 秒以上)`
+            }
+          ]
+        };
+      } catch (err) {
+        return {
+          isError: true,
+          content: [{ type: 'text', text: `删除笔记失败: ${err.message}` }]
+        };
+      }
+    }
+  );
 }
+

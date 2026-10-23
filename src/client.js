@@ -231,4 +231,70 @@ export class IlinksClient {
       body: { id }
     });
   }
+
+  /**
+   * 获取用户的笔记列表
+   * @param {Object} [options]
+   * @param {number|null} [options.folder_id] 指定文件夹 ID
+   * @param {number} [options.limit] 分页限制
+   * @param {number} [options.offset] 分页偏移
+   */
+  async listNotes({ folder_id = null, limit = 50, offset = 0 } = {}) {
+    if (folder_id) {
+      const res = await this.request(`/api/v1/notesbyfolderid/${folder_id}?limit=${limit}&offset=${offset}`);
+      return res && res.items ? res.items : (Array.isArray(res) ? res : []);
+    }
+    const res = await this.request('/api/v1/mynotes');
+    return Array.isArray(res) ? res : (res && res.items ? res.items : []);
+  }
+
+  /**
+   * 创建笔记
+   * @param {Object} data
+   * @param {number} data.fid 目标笔记文件夹 ID
+   * @param {string} data.content Markdown 正文
+   * @param {number} [data.weight] 排序权重
+   */
+  async createNote({ fid, content, weight = 0 }) {
+    return await this.request('/api/v1/notes/posts', {
+      method: 'POST',
+      body: {
+        fid: Number(fid),
+        content,
+        weight: Number(weight) || 0
+      }
+    });
+  }
+
+  /**
+   * 更新笔记
+   * @param {Object} data
+   * @param {number} data.id 笔记 ID
+   * @param {number} data.fid 笔记文件夹 ID
+   * @param {string} data.content Markdown 正文
+   * @param {number} [data.weight] 排序权重
+   */
+  async updateNote({ id, fid, content, weight = 0 }) {
+    return await this.request('/api/v1/notes/posts', {
+      method: 'PUT',
+      body: {
+        id: Number(id),
+        fid: Number(fid),
+        content,
+        weight: Number(weight) || 0
+      }
+    });
+  }
+
+  /**
+   * 删除笔记
+   * @param {number} id 笔记 ID
+   */
+  async deleteNote(id) {
+    return await this.request(`/api/v1/notes/posts?id=${id}`, {
+      method: 'DELETE',
+      body: { id: Number(id) }
+    });
+  }
 }
+

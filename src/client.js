@@ -8,6 +8,7 @@ export class IlinksClient {
       options.apiBase || process.env.ILINKS_API_BASE || process.env.XYDH_API_BASE || 'https://ilinks.fun'
     );
     this.token = (options.token || process.env.ILINKS_TOKEN || process.env.XYDH_TOKEN || '').trim();
+    this.getClientInfo = typeof options.getClientInfo === 'function' ? options.getClientInfo : null;
   }
 
   sanitizeApiBase(base) {
@@ -16,6 +17,24 @@ export class IlinksClient {
       url = 'https://' + url;
     }
     return url.replace(/\/+$/, '');
+  }
+
+  getAgentClientName() {
+    let clientName = '';
+    if (this.getClientInfo) {
+      try {
+        const info = this.getClientInfo();
+        if (info && typeof info === 'object' && info.name) {
+          clientName = String(info.name).trim();
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+    if (!clientName && process.env.ILINKS_AGENT_CLIENT) {
+      clientName = String(process.env.ILINKS_AGENT_CLIENT).trim();
+    }
+    return clientName || 'AI Agent';
   }
 
   setAuth(token, apiBase) {
@@ -34,11 +53,14 @@ export class IlinksClient {
       );
     }
 
+    const agentClient = this.getAgentClientName();
     const url = `${this.apiBase}${path}`;
     const headers = {
       'Accept': 'application/json',
       'Authorization': `Bearer ${this.token}`,
       'X-Token': this.token,
+      'X-Agent-Source': 'mcp',
+      'X-Agent-Client': agentClient,
       ...(options.headers || {})
     };
 

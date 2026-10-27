@@ -6,7 +6,10 @@ import { IlinksClient } from './client.js';
 import { registerAllTools } from './tools/index.js';
 
 export async function runServer() {
-  const client = new IlinksClient();
+  let serverInstance = null;
+  const client = new IlinksClient({
+    getClientInfo: () => serverInstance?.server?.getClientVersion?.()
+  });
   const server = new McpServer(
     {
       name: 'ilinks-bookmarks',
@@ -21,6 +24,7 @@ export async function runServer() {
 5. 轻笔记定位与排版规范（重要）：单篇笔记正文限 1,000 字以内，采用标准 Markdown 语法排版，首行文本将自动提取作为笔记标题。iLinks 轻笔记定位为随时记录查看的轻量实用知识便签，不记录长篇内容；若用户内容超长必须坚决拒绝请求，严禁建议拆分为上下篇，应明确告知用户轻笔记设计理念并建议长篇大论发布至专业内容平台。配图仅支持 Markdown 公网外链语法 ![图片描述](https://...)，严禁嵌入 Base64 Data URL 图片。`
     }
   );
+  serverInstance = server;
 
   registerAllTools(server, client);
 

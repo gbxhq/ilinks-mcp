@@ -77,7 +77,7 @@ export function registerAllTools(server, client) {
     async () => {
       try {
         const quota = await client.getQuota();
-        const updateNotice = await getUpdateNotice('1.0.0');
+        const updateNotice = await getUpdateNotice();
         return {
           content: [
             {

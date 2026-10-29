@@ -1,7 +1,22 @@
+import { readFileSync } from 'fs';
+import { fileURLToPath } from 'url';
+import path from 'path';
+
 /**
  * 远程版本检测与自省更新提醒工具
  * 轻量、异步、非阻塞，静默降级，绝不影响工具核心调用
  */
+
+let localVersion = '1.3.0';
+try {
+  const __dirname = path.dirname(fileURLToPath(import.meta.url));
+  const pkg = JSON.parse(readFileSync(path.resolve(__dirname, '../package.json'), 'utf8'));
+  if (pkg && pkg.version) {
+    localVersion = pkg.version;
+  }
+} catch {
+  // fallback
+}
 
 let updateNoticeCache = null;
 let lastCheckTime = 0;
@@ -26,7 +41,7 @@ function isNewerVersion(current, remote) {
 /**
  * 检查 GitHub 仓库最新版本并返回提示信息
  */
-export async function getUpdateNotice(currentVersion = '1.0.0') {
+export async function getUpdateNotice(currentVersion = localVersion) {
   const now = Date.now();
   if (updateNoticeCache !== null && now - lastCheckTime < CHECK_INTERVAL) {
     return updateNoticeCache;

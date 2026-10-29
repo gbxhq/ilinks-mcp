@@ -34,7 +34,56 @@ export class IlinksClient {
     if (!clientName && process.env.ILINKS_AGENT_CLIENT) {
       clientName = String(process.env.ILINKS_AGENT_CLIENT).trim();
     }
-    return clientName || 'AI Agent';
+
+    // 智能宿主环境特征侦测：在宿主未通过 MCP handshake 正确提供客户端标识，
+    // 或上报了自包含/技术性扩展名（如 'ilinks-recorder'、'ilinks-bookmarks'、'ilinks-mcp'）时，
+    // 优先从环境变量特征识别真实宿主客户端（如 WorkBuddy、Cursor、Windsurf 等）
+    const lower = clientName.toLowerCase();
+    const isSelfOrGeneric =
+      !clientName ||
+      lower === 'ai agent' ||
+      lower === 'mcp' ||
+      lower.includes('ilinks-recorder') ||
+      lower.includes('ilinks_recorder') ||
+      lower.includes('ilinks-bookmarks') ||
+      lower.includes('ilinks-mcp') ||
+      lower === 'recorder';
+
+    if (isSelfOrGeneric) {
+      if (
+        process.env.WORKBUDDY_APP_DIR ||
+        process.env.WORKBUDDY_MCP_MANAGER ||
+        process.env.WORKBUDDY_WORKSPACE ||
+        process.env.CODEBUDDY_WORKSPACE ||
+        process.env.WORKBUDDY_RUNTIME
+      ) {
+        return 'WorkBuddy';
+      }
+      if (
+        process.env.CURSOR_AGENT ||
+        process.env.CURSOR_VERSION ||
+        process.env.CURSOR_EXEC_PATH
+      ) {
+        return 'Cursor';
+      }
+      if (process.env.WINDSURF_AGENT || process.env.WINDSURF_VERSION) {
+        return 'Windsurf';
+      }
+      if (process.env.ANTIGRAVITY_AGENT || process.env.ANTIGRAVITY_APP_DATA_DIR) {
+        return 'Antigravity';
+      }
+      if (process.env.CLINE_DIR || process.env.ROO_CODE) {
+        return 'Cline';
+      }
+
+      // 若无法侦测到具体宿主环境，且标识包含 recorder / ilinks，归一化为友好的智能助手名称
+      if (lower.includes('recorder') || lower.includes('ilinks')) {
+        return 'iLinks Assistant';
+      }
+      return 'AI Agent';
+    }
+
+    return clientName;
   }
 
   setAuth(token, apiBase) {

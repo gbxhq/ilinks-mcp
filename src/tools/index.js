@@ -9,6 +9,15 @@ export function formatQuotaSummary(quota) {
   const contentRem = quota.is_vip ? '无限制' : `${quota.content_remaining} 条`;
   const folderRem = quota.is_vip ? '无限制' : `${quota.folder_remaining} 个`;
 
+  let quotaNotice = '';
+  if (!quota.is_vip) {
+    if (quota.content_remaining <= 0) {
+      quotaNotice = '🚫 提示: 您的书签与笔记容量已达上限！建议清理失效内容，或前往兑换中心购买 VIP / 扩容：https://ilinks.fun/redeem';
+    } else if (quota.content_remaining <= 5) {
+      quotaNotice = `💡 提示: 您的书签与笔记可用容量仅剩 ${quota.content_remaining} 条，快用完啦！如需扩容或开通无限容量 VIP，欢迎前往兑换中心购买：https://ilinks.fun/redeem`;
+    }
+  }
+
   return [
     `【iLinks 账号与容量配额】`,
     `用户: ${quota.user_name} (ID: ${quota.user_id}) | 账号身份: ${vipText}`,
@@ -17,7 +26,8 @@ export function formatQuotaSummary(quota) {
     `   └ 书签: ${quota.link_count} 条 | 笔记: ${quota.note_count} 条 (共享容量)`,
     `📁 文件夹数量: ${quota.folder_count} / ${quota.folder_limit} 个 (剩余可用: ${folderRem})`,
     `📥 暂存箱使用: ${quota.temp_count} / ${quota.temp_limit} 条 (剩余容量: ${quota.temp_remaining} 条)`,
-    quota.is_banned ? `⚠️ 警告: 该账号处于封禁状态，无法继续添加内容。` : ''
+    quota.is_banned ? `⚠️ 警告: 该账号处于封禁状态，无法继续添加内容。` : '',
+    quotaNotice
   ].filter(Boolean).join('\n');
 }
 
@@ -128,7 +138,7 @@ export function registerAllTools(server, client) {
     {
       name: z.string().min(1).max(30).describe('文件夹名称 (1-30字符)'),
       content_type: z.enum(['bookmark', 'note']).default('bookmark').describe('文件夹类型：bookmark (书签) 或 note (笔记)'),
-      icon: z.string().optional().describe('图标名称或图标 URL'),
+      icon: z.string().optional().describe('文件夹图标 (可选)。推荐从 Tabler 图标库 (v3.x，如 folder, folders, code, book, tools, palette, chart-bar 等) 挑选契合分类主题的图标名，也可填公网图片 URL'),
       info: z.string().max(30).optional().describe('文件夹描述说明 (0-30字符)'),
       password: z.string().max(16).optional().describe('访问密码（可选，设置后公开页面需密码才能查看内容）')
     },
@@ -147,7 +157,7 @@ export function registerAllTools(server, client) {
                   `您当前已创建 ${quota.folder_count} 个文件夹，已达到系统上限 (${quota.folder_limit} 个)！无法创建新文件夹。`,
                   `\n💡 建议操作：`,
                   `1. 使用 \`ilinks_delete_folder\` 删除不再需要的旧文件夹以释放名额；`,
-                  `2. 升级为 VIP 会员享受无限文件夹与无限书签额度。`
+                  `2. 前往官方兑换中心购买 VIP 或扩容：https://ilinks.fun/redeem`
                 ].join('\n')
               }
             ]
@@ -344,8 +354,8 @@ export function registerAllTools(server, client) {
       title: z.string().min(1).max(100).describe('书签标题/网站名称 (1-100字符)'),
       url: z.string().url().describe('网页链接，必须以 http:// 或 https:// 开头'),
       folder_id: z.number().default(0).describe('目标文件夹 ID。填 0 或不填则存入暂存箱'),
-      info: z.string().max(500).optional().describe('书签备注或简介 (0-500字符)'),
-      icon: z.string().max(255).optional().describe('网站图标 URL (可选)')
+      info: z.string().max(500).optional().describe('网站简短描述 (可选，建议 10~50 字简述网站核心定位或功能，如"GitHub 官方网站，开源代码托管与协作平台"，便于检索与主页展示)'),
+      icon: z.string().max(255).optional().describe('网站图标 (可选)。推荐从 Tabler 图标库 (v3.x，如 brand-github, robot, code, world-www, file-text, video, music 等) 挑选贴合网站主题的图标名，也可传网站 Favicon 图片公网 URL。留空则系统自动匹配默认图标')
     },
     async ({ title, url, folder_id = 0, info = '', icon = '' }) => {
       try {
@@ -365,7 +375,7 @@ export function registerAllTools(server, client) {
                   `本次添加「${title}」已被安全拦截，未能写入。`,
                   `\n💡 建议操作：`,
                   `1. 使用 \`ilinks_search_bookmarks\` 搜索并清理不再需要的旧书签，释放容量空间；`,
-                  `2. 升级为 VIP 会员解锁无限书签与无限笔记存储。`
+                  `2. 前往官方兑换中心购买 VIP 或扩容卡获得更多空间：https://ilinks.fun/redeem`
                 ].join('\n')
               }
             ]
@@ -437,8 +447,8 @@ export function registerAllTools(server, client) {
           z.object({
             title: z.string().min(1).describe('书签标题'),
             url: z.string().url().describe('网页链接'),
-            info: z.string().optional().describe('备注说明'),
-            icon: z.string().optional().describe('图标')
+            info: z.string().optional().describe('网站简短描述 (可选，建议 10~50 字简述核心功能)'),
+            icon: z.string().optional().describe('网站图标 (可选，推荐 Tabler 图标名如 brand-github, robot, code, world-www 或公网 URL)')
           })
         )
         .min(1)
@@ -464,7 +474,7 @@ export function registerAllTools(server, client) {
                   `\n💡 建议操作：`,
                   `1. 拆分本次书签列表，仅添加前 ${quota.content_remaining} 条；`,
                   `2. 删除已废弃的旧书签释放配额；`,
-                  `3. 升级为 VIP 会员享受无限存储配额。`
+                  `3. 前往官方兑换中心购买 VIP 或扩容卡解锁无限制容量：https://ilinks.fun/redeem`
                 ].join('\n')
               }
             ]
@@ -509,8 +519,8 @@ export function registerAllTools(server, client) {
       folder_id: z.number().describe('新的文件夹 ID (不可填 0，若要移至暂存箱请使用 ilinks_move_to_temp)'),
       title: z.string().min(1).max(100).describe('书签标题'),
       url: z.string().url().describe('网页链接'),
-      info: z.string().max(500).optional().describe('备注说明'),
-      icon: z.string().max(255).optional().describe('网站图标')
+      info: z.string().max(500).optional().describe('网站简短描述 (可选，建议 10~50 字简述核心功能)'),
+      icon: z.string().max(255).optional().describe('网站图标 (可选，推荐 Tabler 图标名如 brand-github, robot, code, world-www 等或公网 URL)')
     },
     async ({ id, folder_id, title, url, info = '', icon = '' }) => {
       try {
@@ -754,7 +764,7 @@ export function registerAllTools(server, client) {
                   ``,
                   `💡 优化指引：`,
                   `1. 可通过 \`ilinks_delete_bookmark\` 或 \`ilinks_delete_note\` 删除不再需要的旧内容以释放容量；`,
-                  `2. 升级 VIP 会员解锁无限容量。`,
+                  `2. 前往官方兑换中心购买 VIP 或扩容卡获得更多空间：https://ilinks.fun/redeem`,
                   ``,
                   `📝 您的笔记内容草稿已妥善留存如下，不会丢失：`,
                   content
